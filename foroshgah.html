@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>سفارش ظروف یکبار مصرف - فاکتور موبایل</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;background:#f7f7f7;margin:0;padding:16px;direction:rtl;}
+  .app{max-width:700px;margin:0 auto;}
+  header{text-align:center;margin-bottom:20px;}
+  h1{font-size:1.5rem;color:#333;}
+  .card{background:#fff;border-radius:10px;padding:15px;margin-bottom:15px;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+  input[type=text], input[type=number]{width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;}
+  button{background:#4CAF50;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;margin-top:5px;}
+  button.secondary{background:#1976d2;}
+  .products{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .product{border:1px solid #eee;padding:10px;border-radius:8px;text-align:center;}
+  .product .name{font-weight:600;margin-bottom:5px;}
+  .product .price{color:#666;margin-bottom:5px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:0.95rem;}
+  th, td{border:1px solid #ddd;padding:8px;text-align:center;}
+  .grand-total{font-weight:bold;margin-top:10px;text-align:right;}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:10px;}
+  .final-note{border:2px solid red;color:red;font-weight:bold;padding:10px;margin-top:15px;text-align:center;font-size:1rem;line-height:1.8;}
+  @media(max-width:480px){table, th, td{font-size:0.85rem;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>سفارش ظروف یکبار مصرف</h1>
+  </header>
+
+  <div class="card">
+    <strong>اطلاعات خریدار</strong>
+    <div style="margin-top:10px;">
+      <input type="text" id="firstName" placeholder="نام">
+      <input type="text" id="lastName" placeholder="نام خانوادگی">
+      <input type="text" id="address" placeholder="آدرس محل دریافت کالا">
+      <input type="text" id="mobile" placeholder="شماره موبایل">
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>منوی محصولات</strong>
+    <div class="products" id="products"></div>
+  </div>
+
+  <div class="card">
+    <strong>سبد خرید</strong>
+    <div id="cartEmpty" style="color:#666;margin-top:8px;">هنوز چیزی انتخاب نشده</div>
+    <div id="cartArea" style="display:none;">
+      <table id="cartTable">
+        <thead>
+          <tr><th>ردیف</th><th>محصول</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th><th>حذف</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="grand-total">مبلغ کل: <span id="grandTotal">0</span> تومان</div>
+      <div class="actions">
+        <button id="clearCartBtn" class="secondary">پاک کردن سبد</button>
+        <button id="downloadBtn">دانلود فاکتور (HTML)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const products = [
+  {id:1,name:"لیوان",price:500},
+  {id:2,name:"بشقاب",price:1000},
+  {id:3,name:"قاشق",price:300},
+  {id:4,name:"چنگال",price:400},
+  {id:5,name:"ظرف سالاد",price:1200}
+];
+
+let cart = [];
+const productsEl = document.getElementById('products');
+const cartArea = document.getElementById('cartArea');
+const cartEmpty = document.getElementById('cartEmpty');
+const cartTableBody = document.querySelector('#cartTable tbody');
+const grandTotalEl = document.getElementById('grandTotal');
+
+function fmt(n){ return n.toLocaleString('fa-IR'); }
+
+function renderProducts(){
+  products.forEach(p=>{
+    const div = document.createElement('div');
+    div.className="product";
+    div.innerHTML = `<div class="name">${p.name}</div><div class="price">${fmt(p.price)} تومان</div>
+    <input type="number" min="1" value="1" id="qty-${p.id}">
+    <button onclick="addToCart(${p.id})">افزودن</button>`;
+    productsEl.appendChild(div);
+  });
+}
+
+function addToCart(id){
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const address = document.getElementById('address').value.trim();
+  const mobile = document.getElementById('mobile').value.trim();
+  if(!firstName||!lastName||!address||!mobile){alert("لطفاً ابتدا اطلاعات خریدار را کامل کنید."); return;}
+  const p=products.find(x=>x.id===id);
+  const qty=parseInt(document.getElementById('qty-'+id).value)||1;
+  let item=cart.find(x=>x.id===id);
+  if(item){item.qty+=qty;item.subtotal=item.qty*item.price;}else{cart.push({id:p.id,name:p.name,price:p.price,qty:qty,subtotal:p.price*qty});}
+  renderCart();
+}
+
+function removeFromCart(id){cart=cart.filter(x=>x.id!==id);renderCart();}
+function renderCart(){
+  if(cart.length===0){cartArea.style.display="none";cartEmpty.style.display="block";return;}
+  cartArea.style.display="block";cartEmpty.style.display="none";
+  cartTableBody.innerHTML=""; let grand=0;
+  cart.forEach((it,i)=>{grand+=it.subtotal;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${it.name}</td><td>${it.qty}</td><td>${fmt(it.price)}</td><td>${fmt(it.subtotal)}</td><td><button onclick="removeFromCart(${it.id})">X</button></td>`;
+    cartTableBody.appendChild(tr);
+  });
+  grandTotalEl.textContent=fmt(grand);
+}
+
+document.getElementById('clearCartBtn').onclick=()=>{cart=[];renderCart();};
+
+document.getElementById('downloadBtn').onclick=()=>{
+  if(cart.length===0){alert("سبد خالی است");return;}
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const address = document.getElementById('address').value.trim();
+  const mobile = document.getElementById('mobile').value.trim();
+  if(!firstName||!lastName||!address||!mobile){alert("لطفاً اطلاعات خریدار را کامل کنید."); return;}
+  let rows="",grand=0;
+  cart.forEach((it,i)=>{grand+=it.subtotal;rows+=`<tr><td>${i+1}</td><td>${it.name}</td><td>${it.qty}</td><td>${fmt(it.price)}</td><td>${fmt(it.subtotal)}</td></tr>`;});
+  const now = new Date().toLocaleString("fa-IR");
+  const html=`<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>فاکتور</title>
+  <style>body{font-family:Tahoma,Arial,sans-serif;padding:10px;} table{width:100%;border-collapse:collapse;font-size:0.95rem;} th,td{border:1px solid #ddd;padding:8px;text-align:center;} .grand-total{text-align:right;font-weight:bold;margin-top:10px;} .final-note{border:2px solid red;color:red;font-weight:bold;padding:10px;text-align:center;margin-top:15px;font-size:1rem;line-height:1.8;}</style>
+  </head><body>
+  <h2>فاکتور سفارش</h2>
+  <p>نام خریدار: ${firstName} ${lastName}</p>
+  <p>آدرس: ${address}</p>
+  <p>موبایل: <span dir="ltr">${mobile}</span></p>
+  <p>تاریخ: ${now}</p>
+  <table><tr><th>ردیف</th><th>محصول</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr>
+  ${rows}
+  <tr><td colspan="4">مبلغ کل</td><td>${fmt(grand)}</td></tr></table>
+  <div class="final-note">
+    این فاکتور نهایی است و جهت سفارش نهایی قابل استفاده می‌باشد. <br><br>
+    ✅ لطفاً تصویر این فاکتور را گرفته و برای 
+    <a href="https://wa.me/989374657597" target="_blank">واتس‌اپ</a> یا تلگرام به شماره 
+    <strong><span dir="ltr">09374657597</span></strong> ارسال نمایید. <br><br>
+    💳 بعد از واریز مبلغ به شماره کارت 
+    <strong><span dir="ltr">6104-3375-6060-3225</span></strong>، لطفاً تصویر کارت‌به‌کارت را هم همراه با فاکتور سفارش ارسال فرمایید. <br><br>
+    📷 جهت مشاهده تصاویر محصولات به پیج اینستاگرام 
+    <a href="https://instagram.com/vahidn.sh" target="_blank"><span dir="ltr">@vahidn.sh</span></a> مراجعه نمایید.
+  </div>
+  <p>ممنون از خرید شما 🌹</p>
+  </body></html>`;
+  const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="faktor_mobile.html";
+  a.click();
+};
+
+renderProducts();
+renderCart();
+</script>
+</body>
+</html>
